@@ -241,181 +241,261 @@ plt.show()
 
 ##SHAP XGB TOP 50 SHAP FEATURES
 
-
-# Finding the top features
-
-selected_features_list = []
-
-for dataset in file_name:
-    for classifier, shap_data in shap_dataset_classifier_data[dataset].items():
-        if 'shap_values_df' in shap_data:
-            print(classifier)
-            shap_values_df = shap_dataset_classifier_data[dataset][classifier]['shap_values_df']
-            shap_values_df_normalized = shap_values_df.div(shap_values_df.sum().sum())
-
-
-    # Calculate the mean of absolute values for each column
-    abs_mean_values = np.abs(shap_values_df).mean()
-
-    # Initialize variables
-    total_contribution = 0
-    selected_features = []
-    bottom_features = []
-
-    # Sort the features by absolute mean values in descending order
-    sorted_features = abs_mean_values.sort_values(ascending=False)
-
-    # selecting the top 50 features
-    selected_features = sorted_features[:50].index.values
-    total_contribution = sorted_features[:50].values.sum()
-
-    # Calculate the top-bottom ratio
-    count = len(selected_features)
-    bottom_features = abs_mean_values.nsmallest(count).index.tolist()
-    bottom_features_contribution =  abs_mean_values[bottom_features].sum() / abs_mean_values.sum()
-    top_features_contribution = total_contribution / abs_mean_values.sum()
-    tb_ratio = top_features_contribution / bottom_features_contribution
-
-    # Print the selected features, their cumulative contribution, and odds ratio
-    print("Selected Features:", selected_features)
-    print("Number of Features:", len(selected_features))
-    print("% of Total Features:", count/len(abs_mean_values)*100)
-    print("Cumulative Contribution of Top Features:", top_features_contribution)
-    print("Cumulative Contribution of Bottom Features:", bottom_features_contribution)
-    print("Ratio of Top to Bottom Features:", tb_ratio)
-    print()
-
-    selected_features_list.append(selected_features)
-
-##LightGBM TOP 50 SHAP FEATURES
-
 import shap
-import pandas as pd
 import numpy as np
-import lightgbm as lgb
+import pandas as pd
+import matplotlib.pyplot as plt
 
-# Assuming dataset_classifier_data and X_test are defined elsewhere
-# X_test is your test dataset
-
-# Select the best LightGBM model from the dataset_classifier_data
+# Define the LGBM classifier
+classifier = 'xgb'
 dataset = file_name[0]
-cf_data = dataset_classifier_data[dataset]['lgb']
-best_classifier = 'lgb'
 
-# Load SHAP explainer for the LightGBM model
+# Calculate SHAP values for the LGBM model
+cf_data = dataset_classifier_data[dataset][classifier]
+
+# Initialize SHAP explainer and compute SHAP values
 explainer = shap.TreeExplainer(cf_data['classifier'])
-if isinstance(cf_data['classifier'], lgb.LGBMClassifier):
-    explainer.model.original_model.params['objective'] = 'binary'
-
 shap_values = explainer.shap_values(X_test)
 
-# Handle binary classification
-if isinstance(shap_values, list) and len(shap_values) > 1:
-    shap_values = shap_values[1]  # use the shap values for the positive class
+if isinstance(shap_values, list):
+    # For tree-based models like LGBM, select the SHAP values for the positive class
+    shap_values_class = shap_values[1]
+else:
+    shap_values_class = shap_values
 
-# Create a DataFrame for the SHAP values
-shap_values_df = pd.DataFrame(shap_values, columns=X_test.columns, index=X_test.index)
+# Debug: Print the shape of shap_values_class
+print(f"Classifier: {classifier}, SHAP values shape: {np.array(shap_values_class).shape}")
 
-# Calculate the mean of absolute values for each column
+# Convert SHAP values to DataFrame
+shap_values_df = pd.DataFrame(shap_values_class, columns=X_test.columns)
+
+# Finding the top 20 features
 abs_mean_values = np.abs(shap_values_df).mean()
-
-# Sort the features by absolute mean values in descending order
 sorted_features = abs_mean_values.sort_values(ascending=False)
+top_20_features = sorted_features[:20].index.values
 
-# Select the top 50 features
-top_50_features = sorted_features[:50].index.values
-total_contribution = sorted_features[:50].values.sum()
-
-# Calculate the top-bottom ratio
-count = len(top_50_features)
-bottom_features = abs_mean_values.nsmallest(count).index.tolist()
-bottom_features_contribution = abs_mean_values[bottom_features].sum() / abs_mean_values.sum()
-top_features_contribution = total_contribution / abs_mean_values.sum()
-tb_ratio = top_features_contribution / bottom_features_contribution
-
-# Print the selected features, their cumulative contribution, and odds ratio
-print("Top 50 Selected Features:", top_50_features)
-print("Number of Features:", len(top_50_features))
-print("% of Total Features:", count / len(abs_mean_values) * 100)
-print("Cumulative Contribution of Top Features:", top_features_contribution)
-print("Cumulative Contribution of Bottom Features:", bottom_features_contribution)
-print("Ratio of Top to Bottom Features:", tb_ratio)
-print()
-
-# Store results in a DataFrame for easy inspection
-results_df = pd.DataFrame({
-    'Top Features': top_50_features,
-    'Contribution': sorted_features[:50].values
-})
-
-print(results_df)
-
-#####LASSO TOP 50 SHAP FEATURES
-
+import matplotlib.pyplot as plt
 import shap
+
+
+
+
+import matplotlib.pyplot as plt
+import shap
+
+# Assuming shap_values_class and X_test are already loaded from previous context
+
+fig = plt.figure(dpi=500)
+ax0 = fig.add_subplot(131)
+shap.summary_plot(shap_values_class, X_test, show=False, max_display=20, plot_type='dot')
+ax0.tick_params(axis='y', labelsize=18)  # Increase the y-axis text size
+ax0.tick_params(axis='x', labelsize=18)  # Increase the x-axis text size
+ax0.set_xlabel('SHAP value (impact on model output)', fontsize=18)  # Increase x-axis label text size
+ax0.set_ylabel('Features', fontsize=18)  # Increase y-axis label text size
+
+# Increase the color bar legend text size for the dot plot
+cb = plt.gcf().axes[-1]
+cb.tick_params(labelsize=20)
+
+ax1 = fig.add_subplot(132)
+shap.summary_plot(shap_values_class, X_test, show=False, max_display=20, plot_type='bar')
+ax1.tick_params(axis='y', labelsize=26)  # Increase the y-axis text size
+ax1.tick_params(axis='x', labelsize=20)  # Increase the x-axis text size
+ax1.set_xlabel('mean(|SHAP value|) (average impact on model output magnitude)', fontsize=17)  # Increase x-axis label text size
+
+plt.gcf().set_size_inches(30, 10)  # Increase figure width to give more space for the x-axis label
+plt.tight_layout(rect=[0, 0, 1, 0.96])  # Adjust layout to make space for labels
+plt.savefig('your_dataset_summary_mean.png', bbox_inches='tight')
+plt.show()
+
+# Export the ranked proteins
+feature_importance = pd.DataFrame(list(zip(X_test.columns, np.abs(shap_values_class).mean(0))), columns=['col_name', 'feature_importance_vals'])
+feature_importance.sort_values(by=['feature_importance_vals'], ascending=False, inplace=True)
+ranked_features = feature_importance['col_name'].values
+
+# Export the original dataframe with the values but shap ranked
+RankedMetaboliteData = pd.concat([y, X[ranked_features]], axis=1)
+RankedMetaboliteData.to_csv(f"Python Processed Data/ML and XAI/X values Shap-Ranked for {dataset}.csv", index=True)
+
+# Export the shap values dataframe in the shap-ranked order
+pd.concat([y_test, shap_values_df[ranked_features]], axis=1).to_csv(f"Python Processed Data/ML and XAI/SHAP values Shap-Ranked for {dataset}.csv", index=True)
+
+
+###SHAP LASSO
+import shap
+import numpy as np
 import pandas as pd
+import matplotlib.pyplot as plt
 
-# Assuming the required variables and classifiers are already defined and the previous code block has been executed
+# Define the LASSO classifier
+classifier = 'lasso'
+dataset = file_name[0]
 
-# Verify if the best_classifier is 'lasso' and has the required data
-if 'lasso' in shap_dataset_classifier_data.get(dataset, {}) and 'shap_values_df' in shap_dataset_classifier_data[dataset]['lasso']:
-    # Get the SHAP values dataframe for the Lasso model
-    shap_values_df = shap_dataset_classifier_data[dataset]['lasso']['shap_values_df']
+# Calculate SHAP values for the LASSO model
+cf_data = dataset_classifier_data[dataset][classifier]
 
-    # Calculate the mean absolute SHAP value for each feature
-    mean_abs_shap_values = shap_values_df.abs().mean().sort_values(ascending=False)
+# Initialize SHAP explainer and compute SHAP values
+explainer = shap.LinearExplainer(cf_data['classifier'], X_test)
+shap_values = explainer.shap_values(X_test)
+shap_values_class = shap_values
 
-    # Get the top 50 features
-    top_50_features = mean_abs_shap_values.head(50)
+# Debug: Print the shape of shap_values_class
+print(f"Classifier: {classifier}, SHAP values shape: {np.array(shap_values_class).shape}")
 
-    # Print the top 50 features
-    print(top_50_features)
+# Convert SHAP values to DataFrame
+shap_values_df = pd.DataFrame(shap_values_class, columns=X_test.columns)
 
-    # Visualize the top 50 features using SHAP summary plot
-    top_50_feature_names = top_50_features.index.tolist()
-    top_50_shap_values = shap_values_df[top_50_feature_names]
+# Finding the top 20 features
+abs_mean_values = np.abs(shap_values_df).mean()
+sorted_features = abs_mean_values.sort_values(ascending=False)
+top_20_features = sorted_features[:20].index.values
 
-    shap.summary_plot(top_50_shap_values.values, X_test[top_50_feature_names], plot_type="bar")
+import matplotlib.pyplot as plt
+import shap
 
-    # If you want to get the top 50 SHAP values in a dataframe
-    top_50_shap_values_df = shap_values_df[top_50_feature_names]
-    print(top_50_shap_values_df)
+# Assuming shap_values_class and X_test are already loaded from previous context
+
+fig = plt.figure(dpi=500)
+ax0 = fig.add_subplot(131)
+shap.summary_plot(shap_values_class, X_test, show=False, max_display=20, plot_type='dot')
+ax0.tick_params(axis='y', labelsize=18)  # Increase the y-axis text size
+ax0.tick_params(axis='x', labelsize=18)  # Increase the x-axis text size
+ax0.set_xlabel('SHAP value (impact on model output)', fontsize=18)  # Increase x-axis label text size
+ax0.set_ylabel('Features', fontsize=18)  # Increase y-axis label text size
+
+# Increase the color bar legend text size for the dot plot
+cb = plt.gcf().axes[-1]
+cb.tick_params(labelsize=20)
+
+ax1 = fig.add_subplot(132)
+shap.summary_plot(shap_values_class, X_test, show=False, max_display=20, plot_type='bar')
+ax1.tick_params(axis='y', labelsize=26)  # Increase the y-axis text size
+ax1.tick_params(axis='x', labelsize=20)  # Increase the x-axis text size
+ax1.set_xlabel('mean(|SHAP value|)(average impact on model output magnitude)', fontsize=17)  # Increase x-axis label text size
+
+plt.gcf().set_size_inches(30, 10)  # Increase figure width to give more space for the x-axis label
+plt.tight_layout(rect=[0, 0, 1, 0.96])  # Adjust layout to make space for labels
+plt.savefig('your_dataset_summary_mean.png', bbox_inches='tight')
+plt.show()
+
+# Export the ranked metabolites
+feature_importance = pd.DataFrame(list(zip(X_test.columns, np.abs(shap_values_class).mean(0))), columns=['col_name', 'feature_importance_vals'])
+feature_importance.sort_values(by=['feature_importance_vals'], ascending=False, inplace=True)
+ranked_features = feature_importance['col_name'].values
+
+# Export the original dataframe with the values but shap ranked
+RankedMetaboliteData = pd.concat([y, X[ranked_features]], axis=1)
+RankedMetaboliteData.to_csv(f"Python Processed Data/ML and XAI/X values Shap-Ranked for {dataset}_{classifier}.csv", index=True)
+
+# Export the shap values dataframe in the shap-ranked order
+pd.concat([y_test, shap_values_df[ranked_features]], axis=1).to_csv(f"Python Processed Data/ML and XAI/SHAP values Shap-Ranked for {dataset}_{classifier}.csv", index=True)
+
+
+###SHAP LGB
+import shap
+import numpy as np
+import pandas as pd
+import matplotlib.pyplot as plt
+
+# Define the LGBM classifier
+classifier = 'lgb'
+dataset = file_name[0]
+
+# Calculate SHAP values for the LGBM model
+cf_data = dataset_classifier_data[dataset][classifier]
+
+# Initialize SHAP explainer and compute SHAP values
+explainer = shap.TreeExplainer(cf_data['classifier'])
+shap_values = explainer.shap_values(X_test)
+
+if isinstance(shap_values, list):
+    # For tree-based models like LGBM, select the SHAP values for the positive class
+    shap_values_class = shap_values[1]
 else:
-    print(f"Error: 'lasso' model SHAP values are not available for dataset {dataset}.")
-    if 'lasso' not in shap_dataset_classifier_data.get(dataset, {}):
-        print(f"'lasso' key is missing in shap_dataset_classifier_data[{dataset}].")
-    elif 'shap_values_df' not in shap_dataset_classifier_data[dataset]['lasso']:
-        print(f"'shap_values_df' key is missing in shap_dataset_classifier_data[{dataset}]['lasso'].")
+    shap_values_class = shap_values
 
-# Verify if the best_classifier is 'lasso' and has the required data
-if 'lasso' in dataset_classifier_data.get(dataset, {}) and 'shap_values_df' in dataset_classifier_data[dataset]['lasso']:
-    # Get the SHAP values dataframe for the Lasso model
-    shap_values_df = dataset_classifier_data[dataset]['lasso']['shap_values_df']
+# Debug: Print the shape of shap_values_class
+print(f"Classifier: {classifier}, SHAP values shape: {np.array(shap_values_class).shape}")
 
-    # Calculate the mean absolute SHAP value for each feature
-    mean_abs_shap_values = shap_values_df.abs().mean().sort_values(ascending=False)
+# Convert SHAP values to DataFrame
+shap_values_df = pd.DataFrame(shap_values_class, columns=X_test.columns)
 
-    # Get the top 50 features
-    top_50_features = mean_abs_shap_values.head(50)
+# Finding the top 20 features
+abs_mean_values = np.abs(shap_values_df).mean()
+sorted_features = abs_mean_values.sort_values(ascending=False)
+top_20_features = sorted_features[:20].index.values
 
-    # Print the top 50 features
-    print(top_50_features)
+import matplotlib.pyplot as plt
+import shap
 
-    # Visualize the top 50 features using SHAP summary plot
-    top_50_feature_names = top_50_features.index.tolist()
-    top_50_shap_values = shap_values_df[top_50_feature_names]
 
-    shap.summary_plot(top_50_shap_values.values, X_test[top_50_feature_names], plot_type="bar")
 
-    # If you want to get the top 50 SHAP values in a dataframe
-    top_50_shap_values_df = shap_values_df[top_50_feature_names]
-    print(top_50_shap_values_df)
-else:
-    print(f"Error: 'lasso' model SHAP values are not available for dataset {dataset}.")
-    if 'lasso' not in dataset_classifier_data.get(dataset, {}):
-        print(f"'lasso' key is missing in dataset_classifier_data[{dataset}].")
-    elif 'shap_values_df' not in dataset_classifier_data[dataset]['lasso']:
-        print(f"'shap_values_df' key is missing in dataset_classifier_data[{dataset}]['lasso'].")
+
+import matplotlib.pyplot as plt
+import shap
+
+# Assuming shap_values_class and X_test are already loaded from previous context
+
+fig = plt.figure(dpi=500)
+ax0 = fig.add_subplot(131)
+shap.summary_plot(shap_values_class, X_test, show=False, max_display=20, plot_type='dot')
+ax0.tick_params(axis='y', labelsize=18)  # Increase the y-axis text size
+ax0.tick_params(axis='x', labelsize=18)  # Increase the x-axis text size
+ax0.set_xlabel('SHAP value (impact on model output)', fontsize=18)  # Increase x-axis label text size
+ax0.set_ylabel('Features', fontsize=18)  # Increase y-axis label text size
+
+# Increase the color bar legend text size for the dot plot
+cb = plt.gcf().axes[-1]
+cb.tick_params(labelsize=20)
+
+ax1 = fig.add_subplot(132)
+shap.summary_plot(shap_values_class, X_test, show=False, max_display=20, plot_type='bar')
+ax1.tick_params(axis='y', labelsize=26)  # Increase the y-axis text size
+ax1.tick_params(axis='x', labelsize=20)  # Increase the x-axis text size
+ax1.set_xlabel('mean(|SHAP value|) (average impact on model output magnitude)', fontsize=17)  # Increase x-axis label text size
+
+plt.gcf().set_size_inches(30, 10)  # Increase figure width to give more space for the x-axis label
+plt.tight_layout(rect=[0, 0, 1, 0.96])  # Adjust layout to make space for labels
+plt.savefig('your_dataset_summary_mean.png', bbox_inches='tight')
+plt.show()
+
+
+
+
+
+# Export the ranked proteins
+feature_importance = pd.DataFrame(list(zip(X_test.columns, np.abs(shap_values_class).mean(0))), columns=['col_name', 'feature_importance_vals'])
+feature_importance.sort_values(by=['feature_importance_vals'], ascending=False, inplace=True)
+ranked_features = feature_importance['col_name'].values
+
+# Export the original dataframe with the values but shap ranked
+RankedMetaboliteData = pd.concat([y, X[ranked_features]], axis=1)
+RankedMetaboliteData.to_csv(f"Python Processed Data/ML and XAI/X values Shap-Ranked for {dataset}.csv", index=True)
+
+# Export the shap values dataframe in the shap-ranked order
+pd.concat([y_test, shap_values_df[ranked_features]], axis=1).to_csv(f"Python Processed Data/ML and XAI/SHAP values Shap-Ranked for {dataset}.csv", index=True)
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 #####BOSCH DATA
 
