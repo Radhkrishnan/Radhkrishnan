@@ -68,7 +68,8 @@ classifier_data = {
         'tpr': None,
         'auc_score': None,
         'y_pred_prob': None,
-        'ci': None
+        'ci': None,
+        'metrics_ci': {}
     },
     'lgb': {
         'grid_best_mscore': None,
@@ -78,7 +79,8 @@ classifier_data = {
         'tpr': None,
         'auc_score': None,
         'y_pred_prob': None,
-        'ci': None
+        'ci': None,
+        'metrics_ci': {}
     },
     'lasso': {
         'grid_best_mscore': None,
@@ -88,7 +90,8 @@ classifier_data = {
         'tpr': None,
         'auc_score': None,
         'y_pred_prob': None,
-        'ci': None
+        'ci': None,
+        'metrics_ci': {}
     }
 }
 
@@ -105,6 +108,20 @@ def calculate_ci(y_true, y_pred_prob, confidence_level=0.95):
         score = roc_auc_score(y_true[indices], y_pred_prob[indices])
         auc_scores.append(score)
     sorted_scores = np.sort(auc_scores)
+    lower_bound = sorted_scores[int((1.0 - confidence_level) / 2.0 * len(sorted_scores))]
+    upper_bound = sorted_scores[int((1.0 + confidence_level) / 2.0 * len(sorted_scores))]
+    return lower_bound, upper_bound
+
+def bootstrap_ci(y_true, y_pred, metric_func, n_bootstraps=1000, confidence_level=0.95):
+    scores = []
+    rng = np.random.RandomState(seed=42)
+    for _ in range(n_bootstraps):
+        indices = rng.randint(0, len(y_pred), len(y_pred))
+        if len(np.unique(y_true[indices])) < 2:
+            continue
+        score = metric_func(y_true[indices], y_pred[indices])
+        scores.append(score)
+    sorted_scores = np.sort(scores)
     lower_bound = sorted_scores[int((1.0 - confidence_level) / 2.0 * len(sorted_scores))]
     upper_bound = sorted_scores[int((1.0 + confidence_level) / 2.0 * len(sorted_scores))]
     return lower_bound, upper_bound
@@ -186,6 +203,22 @@ for i, classifier in enumerate(classifier_data):
     print("Precision:", precision)
     print("F1 Score:", f1)
     print("Balanced Accuracy:", balanced_accuracy)
+
+    # Calculate confidence intervals for additional metrics
+    specificity_ci = bootstrap_ci(true_labels, predicted_labels, lambda y_true, y_pred: np.mean((y_true == 0) & (y_pred == 0)) / np.mean(y_true == 0))
+    recall_ci = bootstrap_ci(true_labels, predicted_labels, recall_score)
+    precision_ci = bootstrap_ci(true_labels, predicted_labels, precision_score)
+    f1_ci = bootstrap_ci(true_labels, predicted_labels, f1_score)
+
+    classifier_data[classifier]['metrics_ci']['specificity'] = specificity_ci
+    classifier_data[classifier]['metrics_ci']['recall'] = recall_ci
+    classifier_data[classifier]['metrics_ci']['precision'] = precision_ci
+    classifier_data[classifier]['metrics_ci']['f1'] = f1_ci
+
+    print("Specificity CI:", specificity_ci)
+    print("Sensitivity (Recall) CI:", recall_ci)
+    print("Precision CI:", precision_ci)
+    print("F1 Score CI:", f1_ci)
     print("-"*40)
 
 dataset_classifier_data[file_name[0]] = copy.deepcopy(classifier_data)
@@ -383,4 +416,230 @@ else:
         print(f"'lasso' key is missing in dataset_classifier_data[{dataset}].")
     elif 'shap_values_df' not in dataset_classifier_data[dataset]['lasso']:
         print(f"'shap_values_df' key is missing in dataset_classifier_data[{dataset}]['lasso'].")
+
+#####BOSCH DATA
+
+import pandas as pd
+import numpy as np
+import matplotlib.pyplot as plt
+from sklearn.metrics import roc_auc_score, roc_curve, confusion_matrix, recall_score, precision_score, f1_score, balanced_accuracy_score
+
+# Load the validation dataset
+X_val = pd.read_csv("Bosh _ validation (3).csv")
+y_val = X_val['casecontrol']
+X_val = X_val.drop('casecontrol', axis=1)
+
+# Assuming X_train is defined elsewhere with the correct training features
+# Identify the features that are missing in the validation set
+missing_features = [feature for feature in X_train.columns if feature not in X_val.columns]
+
+# Add the missing features to the validation set with zero values
+for feature in missing_features:
+    X_val[feature] = 0
+
+# Remove additional features not present in X_train
+additional_features = [feature for feature in X_val.columns if feature not in X_train.columns]
+X_val = X_val.drop(columns=additional_features)
+
+# Reorder the columns of X_val to match X_train
+X_val = X_val[X_train.columns]
+
+# Initialize the results dictionary for validation metrics
+validation_results = {
+    'xgb': {
+        'fpr': None,
+        'tpr': None,
+        'auc_score': None,
+        'auc_ci': None,
+        'recall_ci': None,
+        'precision_ci': None,
+        'f1_ci': None,
+        'balanced_accuracy_ci': None
+    },
+    'lgb': {
+        'fpr': None,
+        'tpr': None,
+        'auc_score': None,
+        'auc_ci': None,
+        'recall_ci': None,
+        'precision_ci': None,
+        'f1_ci': None,
+        'balanced_accuracy_ci': None
+    },
+    'lasso': {
+        'fpr': None,
+        'tpr': None,
+        'auc_score': None,
+        'auc_ci': None,
+        'recall_ci': None,
+        'precision_ci': None,
+        'f1_ci': None,
+        'balanced_accuracy_ci': None
+    }
+}
+
+# Function to calculate confidence intervals for a metric
+def calculate_metric_ci(y_true, y_pred, metric_func, confidence_level=0.95):
+    scores = []
+    n_bootstraps = 1000
+    rng = np.random.RandomState(seed=42)
+    for _ in range(n_bootstraps):
+        indices = rng.randint(0, len(y_pred), len(y_pred))
+        if len(np.unique(y_true[indices])) < 2:
+            continue
+        score = metric_func(y_true[indices], y_pred[indices])
+        scores.append(score)
+    sorted_scores = np.sort(scores)
+    lower_bound = sorted_scores[int((1.0 - confidence_level) / 2.0 * len(sorted_scores))]
+    upper_bound = sorted_scores[int((1.0 + confidence_level) / 2.0 * len(sorted_scores))]
+    return lower_bound, upper_bound
+
+# Evaluate models on the validation set
+for model_key, data in classifier_data.items():
+    if data['classifier'] is None:
+        print(f"No model available for {model_key}. Skipping...")
+        continue
+
+    print(f"Evaluating {model_key.upper()} model on validation data...")
+    best_model = data['classifier']
+
+    # Predict probabilities or labels depending on the model
+    y_pred_prob = best_model.predict_proba(X_val.values)[:, 1] if model_key != 'lasso' else best_model.predict(X_val.values)
+    validation_results[model_key]['y_pred_prob'] = y_pred_prob
+
+    # Calculate ROC curve and AUC score
+    fpr_val, tpr_val, _ = roc_curve(y_val, y_pred_prob)
+    auc_score_val = roc_auc_score(y_val, y_pred_prob)
+    lower_ci_auc, upper_ci_auc = calculate_metric_ci(y_val.values, y_pred_prob, roc_auc_score)
+
+    validation_results[model_key]['fpr'] = fpr_val
+    validation_results[model_key]['tpr'] = tpr_val
+    validation_results[model_key]['auc_score'] = auc_score_val
+    validation_results[model_key]['auc_ci'] = (lower_ci_auc, upper_ci_auc)
+
+    # Calculate other performance metrics
+    true_labels = y_val.values
+    predicted_labels = best_model.predict(X_val.values)
+    if model_key == 'lasso':
+        predicted_labels = np.where(y_pred_prob >= 0.5, 1, 0)
+
+    confusion = confusion_matrix(true_labels, predicted_labels)
+    TP = confusion[1, 1]
+    TN = confusion[0, 0]
+    FP = confusion[0, 1]
+    FN = confusion[1, 0]
+    specificity = TN / (TN + FP)
+
+    # Calculate confidence intervals for other metrics
+    recall_ci = calculate_metric_ci(true_labels, predicted_labels, recall_score)
+    precision_ci = calculate_metric_ci(true_labels, predicted_labels, precision_score)
+    f1_ci = calculate_metric_ci(true_labels, predicted_labels, f1_score)
+    balanced_accuracy_ci = calculate_metric_ci(true_labels, predicted_labels, balanced_accuracy_score)
+
+    validation_results[model_key]['recall_ci'] = recall_ci
+    validation_results[model_key]['precision_ci'] = precision_ci
+    validation_results[model_key]['f1_ci'] = f1_ci
+    validation_results[model_key]['balanced_accuracy_ci'] = balanced_accuracy_ci
+
+    # Print results
+    recall = recall_score(true_labels, predicted_labels)
+    precision = precision_score(true_labels, predicted_labels)
+    f1 = f1_score(true_labels, predicted_labels)
+    balanced_accuracy = balanced_accuracy_score(true_labels, predicted_labels)
+
+    print(f"Validation AUC score for {model_key.upper()}: {auc_score_val:.2f}")
+    print(f"AUC CI: {validation_results[model_key]['auc_ci']}")
+    print(f"Recall CI: {validation_results[model_key]['recall_ci']}")
+    print(f"Precision CI: {validation_results[model_key]['precision_ci']}")
+    print(f"F1 Score CI: {validation_results[model_key]['f1_ci']}")
+    print(f"Balanced Accuracy CI: {validation_results[model_key]['balanced_accuracy_ci']}")
+    print(f"Specificity: {specificity:.2f}")
+    print(f"Sensitivity (Recall): {recall:.2f}")
+    print(f"Precision: {precision:.2f}")
+    print(f"F1 Score: {f1:.2f}")
+    print(f"Balanced Accuracy: {balanced_accuracy:.2f}")
+    print("-"*40)
+
+# Plot ROC Curves for validation
+plt.figure(figsize=(10, 8))
+for model_key in validation_results:
+    if validation_results[model_key]['fpr'] is not None and validation_results[model_key]['tpr'] is not None:
+        plt.plot(validation_results[model_key]['fpr'], validation_results[model_key]['tpr'],
+                 label=f'{model_key.upper()} (AUC = {validation_results[model_key]["auc_score"]:.2f}, CI = [{validation_results[model_key]["auc_ci"][0]:.2f}, {validation_results[model_key]["auc_ci"][1]:.2f}])')
+
+plt.plot([0, 1], [0, 1], color='navy', linestyle='--')
+plt.xlim([0.0, 1.0])
+plt.ylim([0.0, 1.05])
+plt.xlabel('False Positive Rate')
+plt.ylabel('True Positive Rate')
+plt.title('Validation Receiver Operating Characteristic')
+plt.legend(loc="lower right")
+plt.show()
+
+#####SHAP FOR Bosch data modellling ddddddddddddddddddddddddddddddddddddddddddd
+pip install shap
+import shap
+import matplotlib.pyplot as plt
+import pandas as pd
+
+# Load the validation dataset
+X_val = pd.read_csv("Bosh _ validation (3).csv")
+y_val = X_val['casecontrol']
+X_val = X_val.drop('casecontrol', axis=1)
+
+# Align features with training data
+# Assuming X_train is defined elsewhere with the correct training features
+missing_features = [feature for feature in X_train.columns if feature not in X_val.columns]
+for feature in missing_features:
+    X_val[feature] = 0
+additional_features = [feature for feature in X_val.columns if feature not in X_train.columns]
+X_val = X_val.drop(columns=additional_features)
+X_val = X_val[X_train.columns]
+
+# Specify features of interest
+features_of_interest = ['CEACAM5', 'PLA2G2A']
+
+# Create a SHAP explainer for each model
+for model_key, data in classifier_data.items():
+    if data['classifier'] is None:
+        print(f"No model available for {model_key}. Skipping...")
+        continue
+
+    print(f"\n--- SHAP Analysis for {model_key.upper()} ---\n")
+
+    # Use the best model from training
+    best_model = data['classifier']
+
+    # Initialize the SHAP explainer
+    if model_key == 'lasso':
+        explainer = shap.Explainer(best_model, X_val)
+    elif model_key == 'xgb':
+        explainer = shap.Explainer(best_model, X_train, feature_perturbation="interventional")
+    elif model_key == 'lgb':
+        explainer = shap.TreeExplainer(best_model, X_train)
+
+    # Calculate SHAP values
+    shap_values = explainer(X_val)
+
+    # Filter SHAP values for the features of interest
+    feature_indices = [X_val.columns.get_loc(f) for f in features_of_interest]
+
+    # Global Feature Importance: SHAP Summary Plot (bar) for specified features
+    plt.figure()
+    shap.summary_plot(shap_values[:, feature_indices], X_val[features_of_interest], plot_type="bar", show=False)
+    plt.title(f'Global Feature Importance for {model_key.upper()} (Selected Features)')
+    plt.show()
+
+    # Global Feature Importance: SHAP Beeswarm Plot (summary plot) for specified features
+    plt.figure()
+    shap.summary_plot(shap_values[:, feature_indices], X_val[features_of_interest], show=False)
+    plt.title(f'Global Feature Importance for {model_key.upper()} (Selected Features)')
+    plt.show()
+
+    # Local Feature Importance: SHAP Force Plot for a specific instance (e.g., first instance)
+    # This will visualize how these features contributed to the specific prediction
+    instance_index = 0  # Example: first instance in the dataset
+    shap.force_plot(explainer.expected_value, shap_values[instance_index, feature_indices], X_val.iloc[instance_index, feature_indices], matplotlib=True)
+    plt.title(f'Local Feature Importance for {model_key.upper()} (Instance {instance_index})')
+    plt.show()
 
