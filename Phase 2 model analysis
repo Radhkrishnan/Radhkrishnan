@@ -397,5 +397,194 @@ shap.summary_plot(shap_values[:, top_50_features.index], X_train[top_50_features
 shap.bar_plot(shap_values[:, top_50_features.index], feature_names=top_50_features['feature'])
 
 
+############XGBoost
+import pandas as pd
+import numpy as np
+from sklearn.metrics import roc_auc_score, roc_curve, confusion_matrix, recall_score, precision_score, f1_score, balanced_accuracy_score
+import matplotlib.pyplot as plt
 
+# Load the validation dataset
+X_val = pd.read_csv("bosh 2 vallidation.csv")
+
+# Extract the label column and encode 'Control' as 0 and 'CRC' as 1
+y_val = X_val['casecontrol']
+
+# Drop the label column from the feature set
+X_val = X_val.drop('casecontrol', axis=1)
+
+# Add missing features with zero value to the validation set
+for feature in X_train.columns:
+    if feature not in X_val.columns:
+        X_val[feature] = 0
+
+# Ensure that X_val contains only the features present in X_train
+X_val = X_val[X_train.columns]
+
+# Initialize the results dictionary for validation metrics
+validation_results = {
+    'xgb': {
+        'fpr': None,
+        'tpr': None,
+        'auc_score': None,
+        'y_pred_prob': None,
+        'ci': None,
+        'f1_ci': None,
+        'spec_ci': None,
+        'recall_ci': None,
+        'precision_ci': None
+    },
+    'lgb': {
+        'fpr': None,
+        'tpr': None,
+        'auc_score': None,
+        'y_pred_prob': None,
+        'ci': None,
+        'f1_ci': None,
+        'spec_ci': None,
+        'recall_ci': None,
+        'precision_ci': None
+    },
+    'lasso': {
+        'fpr': None,
+        'tpr': None,
+        'auc_score': None,
+        'y_pred_prob': None,
+        'ci': None,
+        'f1_ci': None,
+        'spec_ci': None,
+        'recall_ci': None,
+        'precision_ci': None
+    }
+}
+
+# Function to calculate confidence intervals for a given metric
+def calculate_metric_ci(y_true, y_pred_prob, metric_func, confidence_level=0.95):
+    metrics = []
+    n_bootstraps = 1000
+    rng = np.random.RandomState(seed=42)
+    for i in range(n_bootstraps):
+        indices = rng.randint(0, len(y_pred_prob), len(y_pred_prob))
+        if len(np.unique(y_true[indices])) < 2:
+            continue
+        score = metric_func(y_true[indices], y_pred_prob[indices])
+        metrics.append(score)
+    sorted_metrics = np.sort(metrics)
+    lower_bound = sorted_metrics[int((1.0 - confidence_level) / 2.0 * len(sorted_metrics))]
+    upper_bound = sorted_metrics[int((1.0 + confidence_level) / 2.0 * len(sorted_metrics))]
+    return lower_bound, upper_bound
+
+# Iterate over each model to predict and evaluate the validation dataset
+for model_key, data in classifier_data.items():
+    print(model_key.upper())
+
+    # Use the best model from training
+    best_model = data['classifier']
+
+    # Predict probabilities or labels depending on the model
+    y_pred_prob = best_model.predict(X_val.values) if model_key == 'lasso' else best_model.predict_proba(X_val.values)[:, 1]
+    validation_results[model_key]['y_pred_prob'] = y_pred_prob
+
+    # Calculate ROC curve and AUC score
+    fpr_val, tpr_val, _ = roc_curve(y_val, y_pred_prob)
+    validation_results[model_key]['fpr'] = fpr_val
+    validation_results[model_key]['tpr'] = tpr_val
+    auc_score_val = roc_auc_score(y_val, y_pred_prob)
+    validation_results[model_key]['auc_score'] = auc_score_val
+
+    # Calculate confidence intervals for AUC
+    lower_ci, upper_ci = calculate_ci(y_val.values, y_pred_prob, confidence_level=0.95)
+    validation_results[model_key]['ci'] = (lower_ci, upper_ci)
+
+    # Calculate other performance metrics
+    true_labels = y_val.values
+    predicted_labels = best_model.predict(X_val.values)
+    if model_key == 'lasso':
+        # Apply 0.5 threshold to classify as 1 or 0
+        predicted_labels = np.where(y_pred_prob >= 0.5, 1, 0)
+
+    confusion = confusion_matrix(true_labels, predicted_labels)
+    TP = confusion[1, 1]
+    TN = confusion[0, 0]
+    FP = confusion[0, 1]
+    FN = confusion[1, 0]
+    specificity = TN / (TN + FP)
+    recall = recall_score(true_labels, predicted_labels)
+    precision = precision_score(true_labels, predicted_labels)
+    f1 = f1_score(true_labels, predicted_labels)
+    balanced_accuracy = balanced_accuracy_score(true_labels, predicted_labels)
+
+    # Calculate confidence intervals for additional metrics
+    specificity_ci = calculate_metric_ci(true_labels, predicted_labels, lambda y_true, y_pred_prob: (confusion_matrix(y_true, predicted_labels)[0, 0] / (confusion_matrix(y_true, predicted_labels)[0, 0] + confusion_matrix(y_true, predicted_labels)[0, 1])))
+    recall_ci = calculate_metric_ci(true_labels, predicted_labels, recall_score)
+    precision_ci = calculate_metric_ci(true_labels, predicted_labels, precision_score)
+    f1_ci = calculate_metric_ci(true_labels, predicted_labels, f1_score)
+
+    validation_results[model_key]['spec_ci'] = specificity_ci
+    validation_results[model_key]['recall_ci'] = recall_ci
+    validation_results[model_key]['precision_ci'] = precision_ci
+    validation_results[model_key]['f1_ci'] = f1_ci
+
+    print("Validation AUC score: ", auc_score_val)
+    print("AUC CI: ", validation_results[model_key]['ci'])
+    print("Specificity CI: ", validation_results[model_key]['spec_ci'])
+    print("Sensitivity (Recall) CI: ", validation_results[model_key]['recall_ci'])
+    print("Precision CI: ", validation_results[model_key]['precision_ci'])
+    print("F1 Score CI: ", validation_results[model_key]['f1_ci'])
+    print("Specificity:", specificity)
+    print("Sensitivity (Recall):", recall)
+    print("Precision:", precision)
+    print("F1 Score:", f1)
+    print("Balanced Accuracy:", balanced_accuracy)
+    print("-"*40)
+
+# Plot ROC Curves for validation
+plt.figure(figsize=(10, 8))
+for model_key in validation_results:
+    plt.plot(validation_results[model_key]['fpr'], validation_results[model_key]['tpr'],
+             label=f'{model_key.upper()} (AUC = {validation_results[model_key]["auc_score"]:.2f}, CI = [{validation_results[model_key]["ci"][0]:.2f}, {validation_results[model_key]["ci"][1]:.2f}])')
+
+plt.plot([0, 1], [0, 1], color='navy', linestyle='--')
+plt.xlim([0.0, 1.0])
+plt.ylim([0.0, 1.05])
+plt.xlabel('False Positive Rate')
+plt.ylabel('True Positive Rate')
+plt.title('Validation Receiver Operating Characteristic')
+plt.legend(loc="lower right")
+plt.show()
+
+
+####SHAP
+import shap
+import matplotlib.pyplot as plt
+
+# Define the list of features to plot
+selected_features = [
+    'LCN2', 'AMY2B', 'DPEP1', 'EPCAM', 'CBLIF', 'FABP6', 'RNASE3', 'CTRC',
+    'SMPDL3A', 'S100P', 'HAGH', 'IMPA1', 'KLK1', 'AMY2A', 'PLA2G2A', 'TFF2',
+    'PIGR', 'FUCA1', 'ACE2', 'RETN', 'ACY1', 'LXN', 'REG3A', 'DPP4', 'CTSC',
+    'TFF3', 'CLPS', 'AHCY', 'PEBP1'
+]
+
+# Plot SHAP values for each model
+for model_key in validation_results:
+    if validation_results[model_key]['shap_values'] is not None:
+        shap_values = validation_results[model_key]['shap_values']
+
+        # Filter SHAP values and X_val to include only the selected features
+        # Ensure the selected features are present in both SHAP values and dataset
+        present_features = [feature for feature in selected_features if feature in X_val.columns]
+        shap_values_filtered = shap_values[:, present_features]
+        X_val_filtered = X_val[present_features]
+
+        # Global SHAP summary plot
+        plt.figure(figsize=(12, 8))
+        shap.summary_plot(shap_values_filtered, X_val_filtered, show=False)
+        plt.title(f'SHAP Summary Plot for {model_key.upper()} (Selected Features)')
+        plt.show()
+
+        # SHAP feature importance plot
+        plt.figure(figsize=(12, 8))
+        shap.summary_plot(shap_values_filtered, X_val_filtered, plot_type="bar", show=False)
+        plt.title(f'SHAP Feature Importance Plot for {model_key.upper()} (Selected Features)')
+        plt.show()
 
