@@ -1,5 +1,5 @@
-###UK BIOBANK
 
+##UK Biobank Phase 1 
 import pandas as pd
 import xgboost as xgb
 import lightgbm as lgb
@@ -237,91 +237,62 @@ plt.ylabel('True Positive Rate')
 plt.title('Model performance(AUC-ROC Curve) of UKBB')
 plt.legend(loc="lower right")
 plt.show()
+###Output
+UKBB
+============================================================
 
+XGB
+Grid Search took 53.68 mins (3221.03 secs)
+Best parameters: {'colsample_bytree': 0.8, 'learning_rate': 0.1, 'max_depth': 5, 'n_estimators': 200, 'subsample': 1.0}
+Grid Validation AUC score: 0.6994046199278758
+Grid Validation std: 0.056003941131403515
+Test AUC score:  0.6575963718820862
+AUC CI:  (0.5495086923658352, 0.7637944066515495)
+Specificity: 0.5306122448979592
+Sensitivity (Recall): 0.7037037037037037
+Precision: 0.6229508196721312
+F1 Score: 0.6608695652173914
+Balanced Accuracy: 0.6171579743008315
+Specificity CI: (0.39024390243902435, 0.6666666666666666)
+Sensitivity (Recall) CI: (0.576271186440678, 0.8235294117647058)
+Precision CI: (0.5, 0.7454545454545455)
+F1 Score CI: (0.5585585585585585, 0.7543859649122807)
 
-##SHAP XGB TOP 50 SHAP FEATURES
+Grid Search took 3.71 mins (222.85 secs)
+Best parameters: {'colsample_bytree': 0.8, 'learning_rate': 0.05, 'max_depth': 5, 'num_leaves': 31, 'subsample': 0.8}
+Grid Validation AUC score: 0.6744306016980436
+Grid Validation std: 0.06886705759341641
+[LightGBM] [Warning] Accuracy may be bad since you didn't explicitly set num_leaves OR 2^max_depth > num_leaves. (num_leaves=31).
+[LightGBM] [Warning] Accuracy may be bad since you didn't explicitly set num_leaves OR 2^max_depth > num_leaves. (num_leaves=31).
+Test AUC score:  0.6961451247165534
+AUC CI:  (0.5862068965517241, 0.7932728647014362)
+Specificity: 0.5918367346938775
+Sensitivity (Recall): 0.7037037037037037
+Precision: 0.6551724137931034
+F1 Score: 0.6785714285714286
+Balanced Accuracy: 0.6477702191987906
+Specificity CI: (0.4583333333333333, 0.7317073170731707)
+Sensitivity (Recall) CI: (0.5789473684210527, 0.8181818181818182)
+Precision CI: (0.532258064516129, 0.7692307692307693)
+F1 Score CI: (0.5742574257425742, 0.7703703703703704)
+LASSO
+Grid Search took 0.01 mins (0.88 secs)
+Best parameters: {'alpha': 0.01}
+Grid Validation AUC score: 0.6856389669761762
+Grid Validation std: 0.05614893561349642
+Test AUC score:  0.7505668934240364
+AUC CI:  (0.6511363636363636, 0.84)
+Specificity: 0.673469387755102
+Sensitivity (Recall): 0.7592592592592593
+Precision: 0.7192982456140351
+F1 Score: 0.7387387387387387
+Balanced Accuracy: 0.7163643235071806
+Specificity CI: (0.54, 0.8)
+Sensitivity (Recall) CI: (0.6461538461538462, 0.8653846153846154)
+Precision CI: (0.5932203389830508, 0.8305084745762712)
+F1 Score CI: (0.6346153846153847, 0.8264462809917354)
 
-import shap
-import numpy as np
-import pandas as pd
-import matplotlib.pyplot as plt
-
-# Define the LGBM classifier
-classifier = 'xgb'
-dataset = file_name[0]
-
-# Calculate SHAP values for the LGBM model
-cf_data = dataset_classifier_data[dataset][classifier]
-
-# Initialize SHAP explainer and compute SHAP values
-explainer = shap.TreeExplainer(cf_data['classifier'])
-shap_values = explainer.shap_values(X_test)
-
-if isinstance(shap_values, list):
-    # For tree-based models like LGBM, select the SHAP values for the positive class
-    shap_values_class = shap_values[1]
-else:
-    shap_values_class = shap_values
-
-# Debug: Print the shape of shap_values_class
-print(f"Classifier: {classifier}, SHAP values shape: {np.array(shap_values_class).shape}")
-
-# Convert SHAP values to DataFrame
-shap_values_df = pd.DataFrame(shap_values_class, columns=X_test.columns)
-
-# Finding the top 20 features
-abs_mean_values = np.abs(shap_values_df).mean()
-sorted_features = abs_mean_values.sort_values(ascending=False)
-top_20_features = sorted_features[:20].index.values
-
-import matplotlib.pyplot as plt
-import shap
-
-
-
-
-import matplotlib.pyplot as plt
-import shap
-
-# Assuming shap_values_class and X_test are already loaded from previous context
-
-fig = plt.figure(dpi=500)
-ax0 = fig.add_subplot(131)
-shap.summary_plot(shap_values_class, X_test, show=False, max_display=20, plot_type='dot')
-ax0.tick_params(axis='y', labelsize=18)  # Increase the y-axis text size
-ax0.tick_params(axis='x', labelsize=18)  # Increase the x-axis text size
-ax0.set_xlabel('SHAP value (impact on model output)', fontsize=18)  # Increase x-axis label text size
-ax0.set_ylabel('Features', fontsize=18)  # Increase y-axis label text size
-
-# Increase the color bar legend text size for the dot plot
-cb = plt.gcf().axes[-1]
-cb.tick_params(labelsize=20)
-
-ax1 = fig.add_subplot(132)
-shap.summary_plot(shap_values_class, X_test, show=False, max_display=20, plot_type='bar')
-ax1.tick_params(axis='y', labelsize=26)  # Increase the y-axis text size
-ax1.tick_params(axis='x', labelsize=20)  # Increase the x-axis text size
-ax1.set_xlabel('mean(|SHAP value|) (average impact on model output magnitude)', fontsize=17)  # Increase x-axis label text size
-
-plt.gcf().set_size_inches(30, 10)  # Increase figure width to give more space for the x-axis label
-plt.tight_layout(rect=[0, 0, 1, 0.96])  # Adjust layout to make space for labels
-plt.savefig('your_dataset_summary_mean.png', bbox_inches='tight')
-plt.show()
-
-# Export the ranked proteins
-feature_importance = pd.DataFrame(list(zip(X_test.columns, np.abs(shap_values_class).mean(0))), columns=['col_name', 'feature_importance_vals'])
-feature_importance.sort_values(by=['feature_importance_vals'], ascending=False, inplace=True)
-ranked_features = feature_importance['col_name'].values
-
-# Export the original dataframe with the values but shap ranked
-RankedMetaboliteData = pd.concat([y, X[ranked_features]], axis=1)
-RankedMetaboliteData.to_csv(f"Python Processed Data/ML and XAI/X values Shap-Ranked for {dataset}.csv", index=True)
-
-# Export the shap values dataframe in the shap-ranked order
-pd.concat([y_test, shap_values_df[ranked_features]], axis=1).to_csv(f"Python Processed Data/ML and XAI/SHAP values Shap-Ranked for {dataset}.csv", index=True)
-
-
-###SHAP LASSO
+##SHAP Uk Biobank
 import shap
 import numpy as np
 import pandas as pd
@@ -378,348 +349,16 @@ plt.tight_layout(rect=[0, 0, 1, 0.96])  # Adjust layout to make space for labels
 plt.savefig('your_dataset_summary_mean.png', bbox_inches='tight')
 plt.show()
 
-# Export the ranked metabolites
-feature_importance = pd.DataFrame(list(zip(X_test.columns, np.abs(shap_values_class).mean(0))), columns=['col_name', 'feature_importance_vals'])
-feature_importance.sort_values(by=['feature_importance_vals'], ascending=False, inplace=True)
-ranked_features = feature_importance['col_name'].values
-
-# Export the original dataframe with the values but shap ranked
-RankedMetaboliteData = pd.concat([y, X[ranked_features]], axis=1)
-RankedMetaboliteData.to_csv(f"Python Processed Data/ML and XAI/X values Shap-Ranked for {dataset}_{classifier}.csv", index=True)
-
-# Export the shap values dataframe in the shap-ranked order
-pd.concat([y_test, shap_values_df[ranked_features]], axis=1).to_csv(f"Python Processed Data/ML and XAI/SHAP values Shap-Ranked for {dataset}_{classifier}.csv", index=True)
-
-
-###SHAP LGB
-import shap
-import numpy as np
-import pandas as pd
-import matplotlib.pyplot as plt
-
-# Define the LGBM classifier
-classifier = 'lgb'
-dataset = file_name[0]
-
-# Calculate SHAP values for the LGBM model
-cf_data = dataset_classifier_data[dataset][classifier]
-
-# Initialize SHAP explainer and compute SHAP values
-explainer = shap.TreeExplainer(cf_data['classifier'])
-shap_values = explainer.shap_values(X_test)
-
-if isinstance(shap_values, list):
-    # For tree-based models like LGBM, select the SHAP values for the positive class
-    shap_values_class = shap_values[1]
-else:
-    shap_values_class = shap_values
-
-# Debug: Print the shape of shap_values_class
-print(f"Classifier: {classifier}, SHAP values shape: {np.array(shap_values_class).shape}")
-
-# Convert SHAP values to DataFrame
-shap_values_df = pd.DataFrame(shap_values_class, columns=X_test.columns)
-
-# Finding the top 20 features
-abs_mean_values = np.abs(shap_values_df).mean()
-sorted_features = abs_mean_values.sort_values(ascending=False)
-top_20_features = sorted_features[:20].index.values
-
-import matplotlib.pyplot as plt
-import shap
-
-
-
-
-import matplotlib.pyplot as plt
-import shap
-
-# Assuming shap_values_class and X_test are already loaded from previous context
-
-fig = plt.figure(dpi=500)
-ax0 = fig.add_subplot(131)
-shap.summary_plot(shap_values_class, X_test, show=False, max_display=20, plot_type='dot')
-ax0.tick_params(axis='y', labelsize=18)  # Increase the y-axis text size
-ax0.tick_params(axis='x', labelsize=18)  # Increase the x-axis text size
-ax0.set_xlabel('SHAP value (impact on model output)', fontsize=18)  # Increase x-axis label text size
-ax0.set_ylabel('Features', fontsize=18)  # Increase y-axis label text size
-
-# Increase the color bar legend text size for the dot plot
-cb = plt.gcf().axes[-1]
-cb.tick_params(labelsize=20)
-
-ax1 = fig.add_subplot(132)
-shap.summary_plot(shap_values_class, X_test, show=False, max_display=20, plot_type='bar')
-ax1.tick_params(axis='y', labelsize=26)  # Increase the y-axis text size
-ax1.tick_params(axis='x', labelsize=20)  # Increase the x-axis text size
-ax1.set_xlabel('mean(|SHAP value|) (average impact on model output magnitude)', fontsize=17)  # Increase x-axis label text size
-
-plt.gcf().set_size_inches(30, 10)  # Increase figure width to give more space for the x-axis label
-plt.tight_layout(rect=[0, 0, 1, 0.96])  # Adjust layout to make space for labels
-plt.savefig('your_dataset_summary_mean.png', bbox_inches='tight')
-plt.show()
-
-
-
-
-
 # Export the ranked proteins
 feature_importance = pd.DataFrame(list(zip(X_test.columns, np.abs(shap_values_class).mean(0))), columns=['col_name', 'feature_importance_vals'])
 feature_importance.sort_values(by=['feature_importance_vals'], ascending=False, inplace=True)
 ranked_features = feature_importance['col_name'].values
 
 # Export the original dataframe with the values but shap ranked
-RankedMetaboliteData = pd.concat([y, X[ranked_features]], axis=1)
-RankedMetaboliteData.to_csv(f"Python Processed Data/ML and XAI/X values Shap-Ranked for {dataset}.csv", index=True)
+RankedproteinData = pd.concat([y, X[ranked_features]], axis=1)
+RankedproteinData.to_csv(f"Python Processed Data/ML and XAI/X values Shap-Ranked for {dataset}_{classifier}.csv", index=True)
 
 # Export the shap values dataframe in the shap-ranked order
-pd.concat([y_test, shap_values_df[ranked_features]], axis=1).to_csv(f"Python Processed Data/ML and XAI/SHAP values Shap-Ranked for {dataset}.csv", index=True)
+pd.concat([y_test, shap_values_df[ranked_features]], axis=1).to_csv(f"Python Processed Data/ML and XAI/SHAP values Shap-Ranked for {dataset}_{classifier}.csv", index=True)
 
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-#####BOSCH DATA
-
-import pandas as pd
-import numpy as np
-import matplotlib.pyplot as plt
-from sklearn.metrics import roc_auc_score, roc_curve, confusion_matrix, recall_score, precision_score, f1_score, balanced_accuracy_score
-
-# Load the validation dataset
-X_val = pd.read_csv("Bosh _ validation (3).csv")
-y_val = X_val['casecontrol']
-X_val = X_val.drop('casecontrol', axis=1)
-
-# Assuming X_train is defined elsewhere with the correct training features
-# Identify the features that are missing in the validation set
-missing_features = [feature for feature in X_train.columns if feature not in X_val.columns]
-
-# Add the missing features to the validation set with zero values
-for feature in missing_features:
-    X_val[feature] = 0
-
-# Remove additional features not present in X_train
-additional_features = [feature for feature in X_val.columns if feature not in X_train.columns]
-X_val = X_val.drop(columns=additional_features)
-
-# Reorder the columns of X_val to match X_train
-X_val = X_val[X_train.columns]
-
-# Initialize the results dictionary for validation metrics
-validation_results = {
-    'xgb': {
-        'fpr': None,
-        'tpr': None,
-        'auc_score': None,
-        'auc_ci': None,
-        'recall_ci': None,
-        'precision_ci': None,
-        'f1_ci': None,
-        'balanced_accuracy_ci': None
-    },
-    'lgb': {
-        'fpr': None,
-        'tpr': None,
-        'auc_score': None,
-        'auc_ci': None,
-        'recall_ci': None,
-        'precision_ci': None,
-        'f1_ci': None,
-        'balanced_accuracy_ci': None
-    },
-    'lasso': {
-        'fpr': None,
-        'tpr': None,
-        'auc_score': None,
-        'auc_ci': None,
-        'recall_ci': None,
-        'precision_ci': None,
-        'f1_ci': None,
-        'balanced_accuracy_ci': None
-    }
-}
-
-# Function to calculate confidence intervals for a metric
-def calculate_metric_ci(y_true, y_pred, metric_func, confidence_level=0.95):
-    scores = []
-    n_bootstraps = 1000
-    rng = np.random.RandomState(seed=42)
-    for _ in range(n_bootstraps):
-        indices = rng.randint(0, len(y_pred), len(y_pred))
-        if len(np.unique(y_true[indices])) < 2:
-            continue
-        score = metric_func(y_true[indices], y_pred[indices])
-        scores.append(score)
-    sorted_scores = np.sort(scores)
-    lower_bound = sorted_scores[int((1.0 - confidence_level) / 2.0 * len(sorted_scores))]
-    upper_bound = sorted_scores[int((1.0 + confidence_level) / 2.0 * len(sorted_scores))]
-    return lower_bound, upper_bound
-
-# Evaluate models on the validation set
-for model_key, data in classifier_data.items():
-    if data['classifier'] is None:
-        print(f"No model available for {model_key}. Skipping...")
-        continue
-
-    print(f"Evaluating {model_key.upper()} model on validation data...")
-    best_model = data['classifier']
-
-    # Predict probabilities or labels depending on the model
-    y_pred_prob = best_model.predict_proba(X_val.values)[:, 1] if model_key != 'lasso' else best_model.predict(X_val.values)
-    validation_results[model_key]['y_pred_prob'] = y_pred_prob
-
-    # Calculate ROC curve and AUC score
-    fpr_val, tpr_val, _ = roc_curve(y_val, y_pred_prob)
-    auc_score_val = roc_auc_score(y_val, y_pred_prob)
-    lower_ci_auc, upper_ci_auc = calculate_metric_ci(y_val.values, y_pred_prob, roc_auc_score)
-
-    validation_results[model_key]['fpr'] = fpr_val
-    validation_results[model_key]['tpr'] = tpr_val
-    validation_results[model_key]['auc_score'] = auc_score_val
-    validation_results[model_key]['auc_ci'] = (lower_ci_auc, upper_ci_auc)
-
-    # Calculate other performance metrics
-    true_labels = y_val.values
-    predicted_labels = best_model.predict(X_val.values)
-    if model_key == 'lasso':
-        predicted_labels = np.where(y_pred_prob >= 0.5, 1, 0)
-
-    confusion = confusion_matrix(true_labels, predicted_labels)
-    TP = confusion[1, 1]
-    TN = confusion[0, 0]
-    FP = confusion[0, 1]
-    FN = confusion[1, 0]
-    specificity = TN / (TN + FP)
-
-    # Calculate confidence intervals for other metrics
-    recall_ci = calculate_metric_ci(true_labels, predicted_labels, recall_score)
-    precision_ci = calculate_metric_ci(true_labels, predicted_labels, precision_score)
-    f1_ci = calculate_metric_ci(true_labels, predicted_labels, f1_score)
-    balanced_accuracy_ci = calculate_metric_ci(true_labels, predicted_labels, balanced_accuracy_score)
-
-    validation_results[model_key]['recall_ci'] = recall_ci
-    validation_results[model_key]['precision_ci'] = precision_ci
-    validation_results[model_key]['f1_ci'] = f1_ci
-    validation_results[model_key]['balanced_accuracy_ci'] = balanced_accuracy_ci
-
-    # Print results
-    recall = recall_score(true_labels, predicted_labels)
-    precision = precision_score(true_labels, predicted_labels)
-    f1 = f1_score(true_labels, predicted_labels)
-    balanced_accuracy = balanced_accuracy_score(true_labels, predicted_labels)
-
-    print(f"Validation AUC score for {model_key.upper()}: {auc_score_val:.2f}")
-    print(f"AUC CI: {validation_results[model_key]['auc_ci']}")
-    print(f"Recall CI: {validation_results[model_key]['recall_ci']}")
-    print(f"Precision CI: {validation_results[model_key]['precision_ci']}")
-    print(f"F1 Score CI: {validation_results[model_key]['f1_ci']}")
-    print(f"Balanced Accuracy CI: {validation_results[model_key]['balanced_accuracy_ci']}")
-    print(f"Specificity: {specificity:.2f}")
-    print(f"Sensitivity (Recall): {recall:.2f}")
-    print(f"Precision: {precision:.2f}")
-    print(f"F1 Score: {f1:.2f}")
-    print(f"Balanced Accuracy: {balanced_accuracy:.2f}")
-    print("-"*40)
-
-# Plot ROC Curves for validation
-plt.figure(figsize=(10, 8))
-for model_key in validation_results:
-    if validation_results[model_key]['fpr'] is not None and validation_results[model_key]['tpr'] is not None:
-        plt.plot(validation_results[model_key]['fpr'], validation_results[model_key]['tpr'],
-                 label=f'{model_key.upper()} (AUC = {validation_results[model_key]["auc_score"]:.2f}, CI = [{validation_results[model_key]["auc_ci"][0]:.2f}, {validation_results[model_key]["auc_ci"][1]:.2f}])')
-
-plt.plot([0, 1], [0, 1], color='navy', linestyle='--')
-plt.xlim([0.0, 1.0])
-plt.ylim([0.0, 1.05])
-plt.xlabel('False Positive Rate')
-plt.ylabel('True Positive Rate')
-plt.title('Validation Receiver Operating Characteristic')
-plt.legend(loc="lower right")
-plt.show()
-
-#####SHAP FOR Bosch data modellling ddddddddddddddddddddddddddddddddddddddddddd
-pip install shap
-import shap
-import matplotlib.pyplot as plt
-import pandas as pd
-
-# Load the validation dataset
-X_val = pd.read_csv("Bosh _ validation (3).csv")
-y_val = X_val['casecontrol']
-X_val = X_val.drop('casecontrol', axis=1)
-
-# Align features with training data
-# Assuming X_train is defined elsewhere with the correct training features
-missing_features = [feature for feature in X_train.columns if feature not in X_val.columns]
-for feature in missing_features:
-    X_val[feature] = 0
-additional_features = [feature for feature in X_val.columns if feature not in X_train.columns]
-X_val = X_val.drop(columns=additional_features)
-X_val = X_val[X_train.columns]
-
-# Specify features of interest
-features_of_interest = ['CEACAM5', 'PLA2G2A']
-
-# Create a SHAP explainer for each model
-for model_key, data in classifier_data.items():
-    if data['classifier'] is None:
-        print(f"No model available for {model_key}. Skipping...")
-        continue
-
-    print(f"\n--- SHAP Analysis for {model_key.upper()} ---\n")
-
-    # Use the best model from training
-    best_model = data['classifier']
-
-    # Initialize the SHAP explainer
-    if model_key == 'lasso':
-        explainer = shap.Explainer(best_model, X_val)
-    elif model_key == 'xgb':
-        explainer = shap.Explainer(best_model, X_train, feature_perturbation="interventional")
-    elif model_key == 'lgb':
-        explainer = shap.TreeExplainer(best_model, X_train)
-
-    # Calculate SHAP values
-    shap_values = explainer(X_val)
-
-    # Filter SHAP values for the features of interest
-    feature_indices = [X_val.columns.get_loc(f) for f in features_of_interest]
-
-    # Global Feature Importance: SHAP Summary Plot (bar) for specified features
-    plt.figure()
-    shap.summary_plot(shap_values[:, feature_indices], X_val[features_of_interest], plot_type="bar", show=False)
-    plt.title(f'Global Feature Importance for {model_key.upper()} (Selected Features)')
-    plt.show()
-
-    # Global Feature Importance: SHAP Beeswarm Plot (summary plot) for specified features
-    plt.figure()
-    shap.summary_plot(shap_values[:, feature_indices], X_val[features_of_interest], show=False)
-    plt.title(f'Global Feature Importance for {model_key.upper()} (Selected Features)')
-    plt.show()
-
-    # Local Feature Importance: SHAP Force Plot for a specific instance (e.g., first instance)
-    # This will visualize how these features contributed to the specific prediction
-    instance_index = 0  # Example: first instance in the dataset
-    shap.force_plot(explainer.expected_value, shap_values[instance_index, feature_indices], X_val.iloc[instance_index, feature_indices], matplotlib=True)
-    plt.title(f'Local Feature Importance for {model_key.upper()} (Instance {instance_index})')
-    plt.show()
 
