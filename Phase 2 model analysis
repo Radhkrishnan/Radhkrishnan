@@ -1,4 +1,4 @@
-###UK Biobank Modelling
+###UK Biobank
 
 import pandas as pd
 import xgboost as xgb
@@ -235,169 +235,128 @@ plt.ylabel('True Positive Rate')
 plt.title('Receiver Operating Characteristic')
 plt.legend(loc="lower right")
 plt.show()
+##output
+XGB
+Grid Search took 28.05 mins (1683.28 secs)
+Best parameters: {'colsample_bytree': 0.8, 'learning_rate': 0.05, 'max_depth': 5, 'n_estimators': 200, 'subsample': 0.8}
+Grid Validation AUC score: 0.6433052219098732
+Grid Validation std: 0.027157919476971597
+Test AUC score:  0.6258503401360545
+AUC CI:  (0.5183450429352069, 0.7276515151515152)
+Specificity: 0.5102040816326531
+Specificity CI: (0.5102040816326531, 0.5102040816326531)
+Sensitivity (Recall): 0.6111111111111112
+Recall CI: (0.48148148148148145, 0.7272727272727273)
+Precision: 0.5789473684210527
+Precision CI: (0.4426229508196721, 0.7058823529411765)
+F1 Score: 0.5945945945945946
+F1 Score CI: (0.4814814814814815, 0.689655172413793)
+Balanced Accuracy: 0.5606575963718821
 
-###### SHAP XBG TOP 50
+Grid Search took 1.75 mins (105.18 secs)
+Best parameters: {'colsample_bytree': 0.8, 'learning_rate': 0.1, 'max_depth': 10, 'num_leaves': 31, 'subsample': 0.8}
+Grid Validation AUC score: 0.6160314620779737
+Grid Validation std: 0.03438455601350587
+Test AUC score:  0.6035525321239608
+AUC CI:  (0.4890710382513661, 0.7026515151515151)
+Specificity: 0.5306122448979592
+Specificity CI: (0.5306122448979592, 0.5306122448979592)
+Sensitivity (Recall): 0.6296296296296297
+Recall CI: (0.4915254237288136, 0.7547169811320755)
+Precision: 0.5964912280701754
+Precision CI: (0.4666666666666667, 0.7254901960784313)
+F1 Score: 0.6126126126126126
+F1 Score CI: (0.5045045045045045, 0.7079646017699114)
+Balanced Accuracy: 0.5801209372637944
+
+LASSO
+Grid Search took 0.00 mins (0.21 secs)
+Best parameters: {'alpha': 0.01}
+Grid Validation AUC score: 0.6317850044012836
+Grid Validation std: 0.04103403349326867
+Test AUC score:  0.6337868480725624
+AUC CI:  (0.5275373721479151, 0.743560606060606)
+Specificity: 0.42857142857142855
+Specificity CI: (0.42857142857142855, 0.42857142857142855)
+Sensitivity (Recall): 0.6666666666666666
+Recall CI: (0.5423728813559322, 0.7954545454545454)
+Precision: 0.5625
+Precision CI: (0.43548387096774194, 0.6811594202898551)
+F1 Score: 0.6101694915254238
+F1 Score CI: (0.5, 0.7096774193548386)
+Balanced Accuracy: 0.5476190476190476
+
+##Shap
 import shap
 import numpy as np
 import pandas as pd
+import matplotlib.pyplot as plt
 
-shap_dataset_classifier_data = {}
-
-# Define the classifiers to analyze
-classifiers = ['xgb']
+# Define the LASSO classifier
+classifier = 'lasso'
 dataset = file_name[0]
 
-# Calculate SHAP values and find top 50 features for each model
-for classifier in classifiers:
-    cf_data = dataset_classifier_data[dataset][classifier]
+# Calculate SHAP values for the LASSO model
+cf_data = dataset_classifier_data[dataset][classifier]
 
-    # Initialize SHAP explainer and compute SHAP values
-    explainer = shap.TreeExplainer(cf_data['classifier']) if classifier != 'lasso' else shap.LinearExplainer(cf_data['classifier'], X_test)
-    shap_values = explainer.shap_values(X_test)
-
-    # Handle different shapes of SHAP values based on classifier type
-    if classifier == 'rf':
-        # For Random Forest, average the SHAP values across all trees and select the positive class
-        shap_values_class = np.mean([shap_value[:, 1] for shap_value in shap_values], axis=0)
-    elif isinstance(shap_values, list) and len(shap_values) == 2:
-        # For binary classifiers (like XGB and LGB), select the SHAP values for the positive class
-        shap_values_class = shap_values[1]
-    else:
-        # For other classifiers (like LASSO), use the computed SHAP values directly
-        shap_values_class = shap_values
-
-    # Convert SHAP values to DataFrame and store it
-    shap_values_df = pd.DataFrame(shap_values_class, columns=X_test.columns)
-    shap_dataset_classifier_data.setdefault(dataset, {})
-    shap_dataset_classifier_data[dataset].setdefault(classifier, {})
-    shap_dataset_classifier_data[dataset][classifier]['shap_values'] = shap_values_class
-    shap_dataset_classifier_data[dataset][classifier]['shap_values_df'] = shap_values_df
-
-    # Finding the top 50 features
-    abs_mean_values = np.abs(shap_values_df).mean()
-    sorted_features = abs_mean_values.sort_values(ascending=False)
-    top_50_features = sorted_features[:50].index.values
-    total_contribution = sorted_features[:50].values.sum()
-    count = len(top_50_features)
-    bottom_features = abs_mean_values.nsmallest(count).index.tolist()
-    bottom_features_contribution = abs_mean_values[bottom_features].sum() / abs_mean_values.sum()
-    top_features_contribution = total_contribution / abs_mean_values.sum()
-    tb_ratio = top_features_contribution / bottom_features_contribution
-
-    # Print the selected features, their cumulative contribution, and odds ratio
-    print(f"Classifier: {classifier}")
-    print("Top 50 Selected Features:", top_50_features)
-    print("Number of Features:", len(top_50_features))
-    print("% of Total Features:", count / len(abs_mean_values) * 100)
-    print("Cumulative Contribution of Top Features:", top_features_contribution)
-    print("Cumulative Contribution of Bottom Features:", bottom_features_contribution)
-    print("Ratio of Top to Bottom Features:", tb_ratio)
-    print()
-
-    shap_dataset_classifier_data[dataset][classifier]['top_40_features'] = top_50_features
-
-# Store results in a DataFrame for easy inspection
-results = []
-
-for classifier in classifiers:
-    top_features = shap_dataset_classifier_data[dataset][classifier]['top_50_features']
-    results.append({'Classifier': classifier, 'Top Features': top_features})
-
-results_df = pd.DataFrame(results)
-print(results_df)
-
-##SHAP LGB TOP 50 FEATURES
-import shap
-import pandas as pd
-import numpy as np
-import lightgbm as lgb
-
-# Assuming dataset_classifier_data and X_test are defined elsewhere
-# X_test is your test dataset
-
-# Select the best LightGBM model from the dataset_classifier_data
-dataset = file_name[0]
-cf_data = dataset_classifier_data[dataset]['lgb']
-best_classifier = 'lgb'
-
-# Load SHAP explainer for the LightGBM model
-explainer = shap.TreeExplainer(cf_data['classifier'])
-if isinstance(cf_data['classifier'], lgb.LGBMClassifier):
-    explainer.model.original_model.params['objective'] = 'binary'
-
+# Initialize SHAP explainer and compute SHAP values
+explainer = shap.LinearExplainer(cf_data['classifier'], X_test)
 shap_values = explainer.shap_values(X_test)
+shap_values_class = shap_values
 
-# Handle binary classification
-if isinstance(shap_values, list) and len(shap_values) > 1:
-    shap_values = shap_values[1]  # use the shap values for the positive class
+# Debug: Print the shape of shap_values_class
+print(f"Classifier: {classifier}, SHAP values shape: {np.array(shap_values_class).shape}")
 
-# Create a DataFrame for the SHAP values
-shap_values_df = pd.DataFrame(shap_values, columns=X_test.columns, index=X_test.index)
+# Convert SHAP values to DataFrame
+shap_values_df = pd.DataFrame(shap_values_class, columns=X_test.columns)
 
-# Calculate the mean of absolute values for each column
+# Finding the top 40 features
 abs_mean_values = np.abs(shap_values_df).mean()
-
-# Sort the features by absolute mean values in descending order
 sorted_features = abs_mean_values.sort_values(ascending=False)
+top_40_features = sorted_features[:20].index.values
 
-# Select the top 50 features
-top_50_features = sorted_features[:50].index.values
-total_contribution = sorted_features[:50].values.sum()
-
-# Calculate the top-bottom ratio
-count = len(top_50_features)
-bottom_features = abs_mean_values.nsmallest(count).index.tolist()
-bottom_features_contribution = abs_mean_values[bottom_features].sum() / abs_mean_values.sum()
-top_features_contribution = total_contribution / abs_mean_values.sum()
-tb_ratio = top_features_contribution / bottom_features_contribution
-
-# Print the selected features, their cumulative contribution, and odds ratio
-print("Top 50 Selected Features:", top_50_features)
-print("Number of Features:", len(top_50_features))
-print("% of Total Features:", count / len(abs_mean_values) * 100)
-print("Cumulative Contribution of Top Features:", top_features_contribution)
-print("Cumulative Contribution of Bottom Features:", bottom_features_contribution)
-print("Ratio of Top to Bottom Features:", tb_ratio)
-print()
-
-# Store results in a DataFrame for easy inspection
-results_df = pd.DataFrame({
-    'Top Features': top_50_features,
-    'Contribution': sorted_features[:50].values
-})
-
-print(results_df)
-
-
-##SHAP LASSO TOP 50
-
+import matplotlib.pyplot as plt
 import shap
 
-# Initialize the explainer with the trained Lasso model
-explainer = shap.LinearExplainer(classifier_data['lasso']['classifier'], X_train, feature_perturbation="interventional")
-shap_values = explainer.shap_values(X_train)
+# Assuming shap_values_class and X_test are already loaded from previous context
 
-# Sum the absolute SHAP values for each feature across all samples to get feature importance
-shap_abs = np.abs(shap_values).mean(axis=0)
-shap_importance = pd.DataFrame({
-    'feature': X_train.columns,
-    'importance': shap_abs
-}).sort_values(by='importance', ascending=False)
+fig = plt.figure(dpi=500)
+ax0 = fig.add_subplot(131)
+shap.summary_plot(shap_values_class, X_test, show=False, max_display=20, plot_type='dot')
+ax0.tick_params(axis='y', labelsize=18)  # Increase the y-axis text size
+ax0.tick_params(axis='x', labelsize=18)  # Increase the x-axis text size
+ax0.set_xlabel('SHAP value (impact on model output)', fontsize=18)  # Increase x-axis label text size
+ax0.set_ylabel('Features', fontsize=18)  # Increase y-axis label text size
 
-# Get the top 50 features
-top_50_features = shap_importance.head(50)
+# Increase the color bar legend text size for the dot plot
+cb = plt.gcf().axes[-1]
+cb.tick_params(labelsize=20)
 
-# Print the top 50 features
-print(top_50_features)
+ax1 = fig.add_subplot(132)
+shap.summary_plot(shap_values_class, X_test, show=False, max_display=20, plot_type='bar')
+ax1.tick_params(axis='y', labelsize=26)  # Increase the y-axis text size
+ax1.tick_params(axis='x', labelsize=20)  # Increase the x-axis text size
+ax1.set_xlabel('mean(|SHAP value|)(average impact on model output magnitude)', fontsize=16)  # Increase x-axis label text size
 
-# Visualize the SHAP values for the top 50 features
-shap.summary_plot(shap_values[:, top_50_features.index], X_train[top_50_features['feature']])
+plt.gcf().set_size_inches(30, 10)  # Increase figure width to give more space for the x-axis label
+plt.tight_layout(rect=[0, 0, 1, 0.96])  # Adjust layout to make space for labels
+plt.savefig('your_dataset_summary_mean.png', bbox_inches='tight')
+plt.show()
 
-# Optionally, plot individual feature importance
-shap.bar_plot(shap_values[:, top_50_features.index], feature_names=top_50_features['feature'])
 
+# Export the ranked metabolites
+feature_importance = pd.DataFrame(list(zip(X_test.columns, np.abs(shap_values_class).mean(0))), columns=['col_name', 'feature_importance_vals'])
+feature_importance.sort_values(by=['feature_importance_vals'], ascending=False, inplace=True)
+ranked_features = feature_importance['col_name'].values
 
-############XGBoost
+# Export the original dataframe with the values but shap ranked
+RankedMetaboliteData = pd.concat([y, X[ranked_features]], axis=1)
+RankedMetaboliteData.to_csv(f"Python Processed Data/ML and XAI/X values Shap-Ranked for {dataset}_{classifier}.csv", index=True)
+
+# Export the shap values dataframe in the shap-ranked order
+pd.concat([y_test, shap_values_df[ranked_features]], axis=1).to_csv(f"Python Processed Data/ML and XAI/SHAP values Shap-Ranked for {dataset}_{classifier}.csv", index=True)
+
+####Validation using bosch dataset
 import pandas as pd
 import numpy as np
 from sklearn.metrics import roc_auc_score, roc_curve, confusion_matrix, recall_score, precision_score, f1_score, balanced_accuracy_score
@@ -551,40 +510,111 @@ plt.ylabel('True Positive Rate')
 plt.title('Validation Receiver Operating Characteristic')
 plt.legend(loc="lower right")
 plt.show()
-
-
-####SHAP
+###output
+XGB
+Validation AUC score:  0.6076923076923078
+AUC CI:  (0.400735294117647, 0.8161764705882353)
+Specificity CI:  (0.3333333333333333, 0.631578947368421)
+Sensitivity (Recall) CI:  (0.4166666666666667, 0.9285714285714286)
+Precision CI:  (0.2857142857142857, 0.7777777777777778)
+F1 Score CI:  (0.3636363636363636, 0.7999999999999999)
+Specificity: 0.6
+Sensitivity (Recall): 0.6923076923076923
+Precision: 0.5294117647058824
+F1 Score: 0.5999999999999999
+Balanced Accuracy: 0.6461538461538461
+----------------------------------------
+LGB
+Validation AUC score:  0.573076923076923
+AUC CI:  (0.36574074074074076, 0.77)
+Specificity CI:  (0.5714285714285714, 0.8333333333333334)
+Sensitivity (Recall) CI:  (0.06666666666666667, 0.5714285714285714)
+Precision CI:  (0.1, 0.75)
+F1 Score CI:  (0.09090909090909091, 0.6)
+Specificity: 0.7
+Sensitivity (Recall): 0.3076923076923077
+Precision: 0.4
+F1 Score: 0.34782608695652173
+Balanced Accuracy: 0.5038461538461538
+LASSO
+Validation AUC score:  0.5538461538461539
+AUC CI:  (0.35185185185185186, 0.7444444444444445)
+Specificity CI:  (0.7894736842105263, 0.9629629629629629)
+Sensitivity (Recall) CI:  (0.0, 0.375)
+Precision CI:  (0.0, 1.0)
+F1 Score CI:  (0.0, 0.5)
+Specificity: 0.9
+Sensitivity (Recall): 0.15384615384615385
+Precision: 0.5
+F1 Score: 0.23529411764705882
+Balanced Accuracy: 0.5269230769230769
+####Shap
 import shap
 import matplotlib.pyplot as plt
+import pandas as pd
 
-# Define the list of features to plot
-selected_features = [
+# Load the validation dataset
+X_val = pd.read_csv("bosh 2 vallidation.csv")
+y_val = X_val['casecontrol']
+X_val = X_val.drop('casecontrol', axis=1)
+
+# Align features with training data
+# Assuming X_train is defined elsewhere with the correct training features
+missing_features = [feature for feature in X_train.columns if feature not in X_val.columns]
+for feature in missing_features:
+    X_val[feature] = 0
+additional_features = [feature for feature in X_val.columns if feature not in X_train.columns]
+X_val = X_val.drop(columns=additional_features)
+X_val = X_val[X_train.columns]
+
+# Specify features of interest
+features_of_interest = [
     'LCN2', 'AMY2B', 'DPEP1', 'EPCAM', 'CBLIF', 'FABP6', 'RNASE3', 'CTRC',
     'SMPDL3A', 'S100P', 'HAGH', 'IMPA1', 'KLK1', 'AMY2A', 'PLA2G2A', 'TFF2',
     'PIGR', 'FUCA1', 'ACE2', 'RETN', 'ACY1', 'LXN', 'REG3A', 'DPP4', 'CTSC',
     'TFF3', 'CLPS', 'AHCY', 'PEBP1'
 ]
 
-# Plot SHAP values for each model
-for model_key in validation_results:
-    if validation_results[model_key]['shap_values'] is not None:
-        shap_values = validation_results[model_key]['shap_values']
+# Create a SHAP explainer for each model
+for model_key, data in classifier_data.items():
+    if data['classifier'] is None:
+        print(f"No model available for {model_key}. Skipping...")
+        continue
 
-        # Filter SHAP values and X_val to include only the selected features
-        # Ensure the selected features are present in both SHAP values and dataset
-        present_features = [feature for feature in selected_features if feature in X_val.columns]
-        shap_values_filtered = shap_values[:, present_features]
-        X_val_filtered = X_val[present_features]
+    print(f"\n--- SHAP Analysis for {model_key.upper()} ---\n")
 
-        # Global SHAP summary plot
-        plt.figure(figsize=(12, 8))
-        shap.summary_plot(shap_values_filtered, X_val_filtered, show=False)
-        plt.title(f'SHAP Summary Plot for {model_key.upper()} (Selected Features)')
-        plt.show()
+    # Use the best model from training
+    best_model = data['classifier']
 
-        # SHAP feature importance plot
-        plt.figure(figsize=(12, 8))
-        shap.summary_plot(shap_values_filtered, X_val_filtered, plot_type="bar", show=False)
-        plt.title(f'SHAP Feature Importance Plot for {model_key.upper()} (Selected Features)')
-        plt.show()
+    # Initialize the SHAP explainer
+    if model_key == 'lasso':
+        explainer = shap.Explainer(best_model, X_val)
+    elif model_key == 'xgb':
+        explainer = shap.Explainer(best_model, X_train, feature_perturbation="interventional")
+    elif model_key == 'lgb':
+        explainer = shap.TreeExplainer(best_model, X_train)
 
+    # Calculate SHAP values
+    shap_values = explainer(X_val)
+
+    # Filter SHAP values for the features of interest
+    feature_indices = [X_val.columns.get_loc(f) for f in features_of_interest]
+
+    # Global Feature Importance: SHAP Summary Plot (bar) for specified features
+    plt.figure()
+    shap.summary_plot(shap_values[:, feature_indices], X_val[features_of_interest], plot_type="bar", show=False)
+    plt.title(f'Global Feature Importance for {model_key.upper()} (Selected Features)')
+    plt.show()
+
+    # Global Feature Importance: SHAP Beeswarm Plot (summary plot) for specified features
+    plt.figure()
+    shap.summary_plot(shap_values[:, feature_indices], X_val[features_of_interest], show=False)
+    plt.title(f'Global Feature Importance for {model_key.upper()} (Selected Features)')
+    plt.show()
+
+    # Local Feature Importance: SHAP Force Plot for a specific instance (e.g., first instance)
+    instance_index = 0  # Example: first instance in the dataset
+    plt.figure()
+    shap.force_plot(explainer.expected_value, shap_values[instance_index, feature_indices], X_val.iloc[instance_index, feature_indices], matplotlib=True)
+    plt.title(f'Local Feature Importance for {model_key.upper()} (Instance {instance_index})')
+    plt.show()
