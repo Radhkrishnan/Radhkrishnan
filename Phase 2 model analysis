@@ -344,14 +344,14 @@ plt.savefig('your_dataset_summary_mean.png', bbox_inches='tight')
 plt.show()
 
 
-# Export the ranked metabolites
+# Export the ranked proteins
 feature_importance = pd.DataFrame(list(zip(X_test.columns, np.abs(shap_values_class).mean(0))), columns=['col_name', 'feature_importance_vals'])
 feature_importance.sort_values(by=['feature_importance_vals'], ascending=False, inplace=True)
 ranked_features = feature_importance['col_name'].values
 
 # Export the original dataframe with the values but shap ranked
-RankedMetaboliteData = pd.concat([y, X[ranked_features]], axis=1)
-RankedMetaboliteData.to_csv(f"Python Processed Data/ML and XAI/X values Shap-Ranked for {dataset}_{classifier}.csv", index=True)
+RankedproteinData = pd.concat([y, X[ranked_features]], axis=1)
+RankedproteinData.to_csv(f"Python Processed Data/ML and XAI/X values Shap-Ranked for {dataset}_{classifier}.csv", index=True)
 
 # Export the shap values dataframe in the shap-ranked order
 pd.concat([y_test, shap_values_df[ranked_features]], axis=1).to_csv(f"Python Processed Data/ML and XAI/SHAP values Shap-Ranked for {dataset}_{classifier}.csv", index=True)
